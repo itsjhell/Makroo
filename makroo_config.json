@@ -12,10 +12,12 @@
     "y": 0,
     "hk_start": {
       "kind": "mouse",
+      "name": "f6",
       "button": "x1"
     },
     "hk_stop": {
       "kind": "mouse",
+      "name": "f6",
       "button": "x2"
     }
   },
