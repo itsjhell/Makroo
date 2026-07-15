@@ -1,0 +1,45 @@
+{
+  "always_on_top": true,
+  "autoclicker": {
+    "interval_value": 100.0,
+    "interval_unit": "millisecondi",
+    "button": "Sinistro",
+    "click_type": "Singolo",
+    "repeat_mode": "inf",
+    "repeat_count": 100,
+    "pos_mode": "current",
+    "x": 0,
+    "y": 0,
+    "hk_start": {
+      "kind": "mouse",
+      "button": "x1"
+    },
+    "hk_stop": {
+      "kind": "mouse",
+      "button": "x2"
+    }
+  },
+  "macro": {
+    "record_moves": false,
+    "repeat_mode": "inf",
+    "repeat_count": 1,
+    "speed": "1x",
+    "speed_custom": 1.0,
+    "hk_rec": {
+      "kind": "key",
+      "name": "f2"
+    },
+    "hk_rec_stop": {
+      "kind": "key",
+      "name": "f2"
+    },
+    "hk_play": {
+      "kind": "key",
+      "name": "f3"
+    },
+    "hk_play_stop": {
+      "kind": "key",
+      "name": "f3"
+    }
+  }
+}
