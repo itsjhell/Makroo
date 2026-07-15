@@ -1,0 +1,14 @@
+# Personal settings (auto-generated at runtime)
+makroo_config.json
+
+# Built executable: publish it as a GitHub Release asset instead
+Makroo.exe
+
+# Python / PyInstaller build artifacts
+__pycache__/
+build/
+dist/
+*.spec
+
+# Saved macros (personal)
+*.macro.json
