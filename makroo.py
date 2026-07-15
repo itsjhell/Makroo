@@ -513,6 +513,8 @@ class HotkeyCapture:
 DEFAULT_CONFIG = {
     "always_on_top": True,
     "mode": "auto",                 # "auto" | "macro" — last selected tab
+    "mini": False,                  # compact bar mode
+    "mini_pos": None,               # [x, y] of the mini bar
     "autoclicker": {
         "interval_value": 100,
         "interval_unit": "milliseconds",
@@ -583,6 +585,8 @@ class MakrooApp:
         self.macro_events = []
         self.macro_name = None
         self.active_mode = "auto"    # which tab is showing: "auto" | "macro"
+        self.mini = False            # compact bar mode active
+        self._drag_off = (0, 0)
         self._pick_listener = None
         self._pick_result = None
 
@@ -601,6 +605,8 @@ class MakrooApp:
             self.notebook.select(1)
         self._on_tab_changed()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        if self.cfg.get("mini"):
+            self.root.after(50, self._enter_mini)
         self._poll()
 
     # ----------------------------- config ---------------------------------
@@ -648,6 +654,9 @@ class MakrooApp:
 
         self.cfg["always_on_top"] = bool(self.topmost_var.get())
         self.cfg["mode"] = self.active_mode
+        self.cfg["mini"] = self.mini
+        if self.mini:
+            self.cfg["mini_pos"] = [self.root.winfo_x(), self.root.winfo_y()]
 
     @staticmethod
     def _get_float(var, default):
@@ -665,12 +674,16 @@ class MakrooApp:
         except Exception:
             pass
 
-        top = ttk.Frame(self.root, padding=(10, 8, 10, 0))
-        top.pack(fill="x")
-        ttk.Label(top, text=APP_NAME, font=("Segoe UI", 14, "bold")).pack(side="left")
+        self.top_frame = ttk.Frame(self.root, padding=(10, 8, 10, 0))
+        self.top_frame.pack(fill="x")
+        ttk.Label(self.top_frame, text=APP_NAME,
+                  font=("Segoe UI", 14, "bold")).pack(side="left")
+        mini_btn = ttk.Button(self.top_frame, text="🗕", width=3,
+                              command=self._enter_mini)
+        mini_btn.pack(side="right", padx=(8, 0))
         self.topmost_var = tk.BooleanVar(value=self.cfg["always_on_top"])
         ttk.Checkbutton(
-            top, text="Always on top",
+            self.top_frame, text="Always on top",
             variable=self.topmost_var, command=self._apply_topmost,
         ).pack(side="right")
 
@@ -684,6 +697,8 @@ class MakrooApp:
         self.statusbar = ttk.Label(self.root, text="Ready", anchor="w",
                                    padding=(10, 4), relief="groove")
         self.statusbar.pack(fill="x", side="bottom")
+
+        self._build_mini_bar()
 
     # --------------------------- autoclicker tab ---------------------------
 
@@ -861,6 +876,114 @@ class MakrooApp:
         self.mc_status = ttk.Label(tab, text="No macro in memory",
                                    anchor="center", font=("Segoe UI", 10, "bold"))
         self.mc_status.pack(fill="x", pady=(8, 0))
+
+    # ------------------------------ mini bar --------------------------------
+
+    def _build_mini_bar(self):
+        """Compact horizontal bar shown instead of the full window."""
+        self.mini_frame = tk.Frame(self.root, bd=1, relief="solid")
+        inner = ttk.Frame(self.mini_frame, padding=(6, 3))
+        inner.pack(fill="x")
+
+        grip = ttk.Label(inner, text="⠿", foreground="gray")
+        grip.pack(side="left", padx=(0, 6))
+        self.mini_mode_btn = ttk.Button(inner, text="🖱", width=3,
+                                        command=self._mini_switch_mode)
+        self.mini_mode_btn.pack(side="left", padx=(0, 6))
+        self.mini_status = ttk.Label(inner, text="■ IDLE",
+                                     font=("Segoe UI", 9, "bold"))
+        self.mini_status.pack(side="left")
+        self.mini_keys = ttk.Label(inner, text="", foreground="gray",
+                                   font=("Segoe UI", 8))
+        self.mini_keys.pack(side="left", padx=(10, 6))
+        ttk.Button(inner, text="⛶", width=3,
+                   command=self._exit_mini).pack(side="right")
+
+        # drag the borderless bar by grabbing any non-button part of it
+        for w in (self.mini_frame, inner, grip, self.mini_status, self.mini_keys):
+            w.bind("<Button-1>", self._drag_start)
+            w.bind("<B1-Motion>", self._drag_move)
+
+    def _enter_mini(self):
+        if self.mini:
+            return
+        self.mini = True
+        self.top_frame.pack_forget()
+        self.notebook.pack_forget()
+        self.statusbar.pack_forget()
+        self.mini_frame.pack(fill="x")
+        self.root.overrideredirect(True)          # borderless
+        self.root.attributes("-topmost", True)    # mini bar is always on top
+        self.root.geometry("")                    # auto-size to content
+        pos = self.cfg.get("mini_pos")
+        if pos:
+            self.root.geometry(f"+{int(pos[0])}+{int(pos[1])}")
+        self._update_mini()
+
+    def _exit_mini(self):
+        if not self.mini:
+            return
+        self.cfg["mini_pos"] = [self.root.winfo_x(), self.root.winfo_y()]
+        self.mini = False
+        self.mini_frame.pack_forget()
+        self.root.overrideredirect(False)
+        self.top_frame.pack(fill="x")
+        self.notebook.pack(fill="both", expand=True, padx=10, pady=8)
+        self.statusbar.pack(fill="x", side="bottom")
+        self.root.geometry("")                    # auto-size back
+        self._apply_topmost()                     # honor the checkbox again
+
+    def _mini_switch_mode(self):
+        self.notebook.select(1 if self.active_mode == "auto" else 0)
+        self._update_mini()
+
+    def _drag_start(self, event):
+        self._drag_off = (event.x_root - self.root.winfo_x(),
+                          event.y_root - self.root.winfo_y())
+
+    def _drag_move(self, event):
+        self.root.geometry(f"+{event.x_root - self._drag_off[0]}"
+                           f"+{event.y_root - self._drag_off[1]}")
+
+    def _mini_hotkey_text(self):
+        a, m = self.cfg["autoclicker"], self.cfg["macro"]
+        if self.active_mode == "auto":
+            if spec_match(a["hk_start"], a["hk_stop"]):
+                return f"{spec_label(a['hk_start'])} start/stop"
+            return (f"{spec_label(a['hk_start'])} start · "
+                    f"{spec_label(a['hk_stop'])} stop")
+        if spec_match(m["hk_rec"], m["hk_rec_stop"]):
+            rec = f"{spec_label(m['hk_rec'])} rec"
+        else:
+            rec = f"{spec_label(m['hk_rec'])}/{spec_label(m['hk_rec_stop'])} rec"
+        if spec_match(m["hk_play"], m["hk_play_stop"]):
+            play = f"{spec_label(m['hk_play'])} play"
+        else:
+            play = f"{spec_label(m['hk_play'])}/{spec_label(m['hk_play_stop'])} play"
+        return f"{rec} · {play}"
+
+    def _update_mini(self):
+        if self.active_mode == "auto":
+            self.mini_mode_btn.config(text="🖱")
+            if self.clicker.running:
+                self.mini_status.config(
+                    text=f"● CLICKING ({self.clicker.clicks_done})",
+                    foreground="#c00000")
+            else:
+                self.mini_status.config(text="■ STOPPED", foreground="#006000")
+        else:
+            self.mini_mode_btn.config(text="⏺")
+            if self.recorder.recording:
+                self.mini_status.config(
+                    text=f"⏺ REC ({len(self.recorder.events)})",
+                    foreground="#c00000")
+            elif self.player.running:
+                self.mini_status.config(
+                    text=f"▶ PLAY (loop {self.player.current_loop})",
+                    foreground="#0050c0")
+            else:
+                self.mini_status.config(text="■ IDLE", foreground="black")
+        self.mini_keys.config(text=self._mini_hotkey_text())
 
     # ------------------------- generic hotkey rows --------------------------
 
@@ -1161,6 +1284,8 @@ class MakrooApp:
             self.mc_play_btn.config(text="▶  Play", state="normal")
 
         self._update_speed_state()
+        if self.mini:
+            self._update_mini()
         self.root.after(100, self._poll)
 
     # ------------------------------ misc ------------------------------------
