@@ -4,9 +4,11 @@ Autoclicker + macro recorder for Windows, all in one program.
 
 ## Launch
 
-Double-click **`Avvia Makroo.bat`** (or run `python makroo.py` from a terminal).
+Double-click **`Makroo.exe`** — fully portable, no installation and no Python required. You can copy just the `.exe` anywhere (USB stick included); settings are saved in a `makroo_config.json` file created next to it.
 
-Requirements: Python 3 with the `pynput` library (`pip install pynput`).
+Running from source instead: `python makroo.py` (requires Python 3 with `pynput` — `pip install pynput`).
+
+To rebuild the exe after changing the source: run `build.bat` (requires `pip install pyinstaller pillow`).
 
 ## Autoclicker mode 🖱
 
